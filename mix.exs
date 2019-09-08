@@ -6,9 +6,24 @@ defmodule TzDatetime.MixProject do
       app: :tz_datetime,
       version: "0.1.0",
       elixir: "~> 1.8",
+      name: "tz_datetime",
+      source_url: "https://github.com/madeitGmbH/tz_datetime",
+      description: description(),
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
+      package: package(),
       deps: deps()
+    ]
+  end
+
+  defp description() do
+    "Handling timezones for datetimes in ecto"
+  end
+
+  defp package() do
+    [
+      licenses: ["Apache-2.0"],
+      links: %{"GitHub" => "https://github.com/madeitGmbH/tz_datetime"}
     ]
   end
 
