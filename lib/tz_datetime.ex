@@ -71,10 +71,10 @@ defmodule TzDatetime do
   the timezone. This is possible for the periods in time when a switch between
   daylight savings time and standard time occurs.
 
-  When the clock is turned backwards a certain naive_datetime and timezone might
-  result in two possible datetimes with different `std_offset`.
+  When the clock is turned backwards a certain naive datetime and timezone might
+  result in two possible datetimes with different `std_offset`s.
 
-  When the clock is turned forward a certain naive_datetime and timezone might
+  When the clock is turned forward a certain naive datetime and timezone might
   result in no possible datetime, where elixir will supply the last possible
   datetime before the switch and the first possible datetime afterwards.
 
@@ -84,19 +84,19 @@ defmodule TzDatetime do
   based on your business domains' requirements:
 
       @impl TzDatetime
-      @spec when_ambiguous(Ecto.Changeset.t(), DateTime.t(), DateTime.t()) ::
+      @spec when_ambiguous(Ecto.Changeset.t(), DateTime.t(), DateTime.t(), TzDatetime.fields) ::
               Ecto.Changeset.t() | DateTime.t()
-      def when_ambiguous(_changeset, dt1, _dt2) do
+      def when_ambiguous(_changeset, dt1, _dt2, _) do
         # Implement your business logic
         dt1
       end
 
       @impl TzDatetime
-      @spec when_gap(Ecto.Changeset.t(), DateTime.t(), DateTime.t()) ::
+      @spec when_gap(Ecto.Changeset.t(), DateTime.t(), DateTime.t(), TzDatetime.fields) ::
               Ecto.Changeset.t() | DateTime.t()
-      def when_gap(changeset, _dt1, _dt2) do
+      def when_gap(changeset, _dt1, _dt2, fields) do
         # Implement your business logic
-        add_error(changeset, :datetime, "does not exist for the selected timezone")
+        add_error(changeset, fields.datetime, "does not exist for the selected timezone")
       end
 
   `handle_datetime/2` will use the module of the changeset's data by default,
@@ -130,7 +130,7 @@ defmodule TzDatetime do
   """
   import Ecto.Changeset
 
-  @typedoc false
+  @typedoc "Holds a mapping of field purposes to actual field names"
   @type fields :: %{
           input_datetime: :atom,
           time_zone: :atom,
@@ -144,7 +144,7 @@ defmodule TzDatetime do
   Handle the case according to your business' requirements by either modifying
   the changeset or returning a single valid `DateTime` struct.
   """
-  @callback when_ambiguous(Ecto.Changeset.t(), DateTime.t(), DateTime.t()) ::
+  @callback when_ambiguous(Ecto.Changeset.t(), DateTime.t(), DateTime.t(), fields) ::
               Ecto.Changeset.t() | DateTime.t()
 
   @doc """
@@ -153,7 +153,7 @@ defmodule TzDatetime do
   Handle the case according to your business' requirements by either modifying
   the changeset or returning a single valid `DateTime` struct.
   """
-  @callback when_gap(Ecto.Changeset.t(), DateTime.t(), DateTime.t()) ::
+  @callback when_gap(Ecto.Changeset.t(), DateTime.t(), DateTime.t(), fields) ::
               Ecto.Changeset.t() | DateTime.t()
 
   @doc """
@@ -191,12 +191,16 @@ defmodule TzDatetime do
 
       {:ambiguous, dt1, dt2} ->
         # the naive datetime happens twice for the given timezones for different std_offsets
-        handle_callback_result(changeset, module.when_ambiguous(changeset, dt1, dt2), fields)
+        handle_callback_result(
+          changeset,
+          module.when_ambiguous(changeset, dt1, dt2, fields),
+          fields
+        )
 
       {:gap, dt1, dt2} ->
         # the naive datetime doesn't happen for the given timezones as
         # the switch in std_offset skips it
-        handle_callback_result(changeset, module.when_gap(changeset, dt1, dt2), fields)
+        handle_callback_result(changeset, module.when_gap(changeset, dt1, dt2, fields), fields)
 
       {:error, :time_zone_not_found} ->
         add_error(changeset, :timezone, "is invalid")

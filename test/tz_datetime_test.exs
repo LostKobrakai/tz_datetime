@@ -54,7 +54,7 @@ defmodule TzDatetimeTest do
         end
       )
 
-      Mox.expect(TzDatetimeMock, :when_ambiguous, fn _, dt1, _ ->
+      Mox.expect(TzDatetimeMock, :when_ambiguous, fn _, dt1, _, _ ->
         dt1
       end)
 
@@ -97,7 +97,7 @@ defmodule TzDatetimeTest do
         end
       )
 
-      Mox.expect(TzDatetimeMock, :when_gap, fn _, _, dt2 ->
+      Mox.expect(TzDatetimeMock, :when_gap, fn _, _, dt2, _ ->
         dt2
       end)
 
