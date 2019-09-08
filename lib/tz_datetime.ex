@@ -1,22 +1,182 @@
 defmodule TzDatetime do
+  @moduledoc """
+  Datetime in a certain timezone with Ecto
+
+  Ecto natively only supports `naive_datetime`s and `utc_datetime`s, which either
+  ignore timezones or enforce only UTC. Both are useful for certain usecases, but
+  not sufficient when needing to store a datetime for different timezones.
+
+  This library is supposed to help for the given use case, but not in the way e.g.
+  `Calecto` does it by implementing a custom `Ecto.Type`. It rather gives you tools
+  to set the correct values for multiple columns on a changeset and converting the
+  values back to a `DateTime` at a later time.
+
+  ## Why not use an `Ecto.Type` implementation
+
+  Timezone definitions change and do so even between storage and retrieval from a
+  database, which is especially problematic for datetimes in the future. When a
+  calendar app stores an event at 10 o'clock in CET a year ahead of time and the
+  timezone definition is changed e.g. to no longer do a daylight savings time the
+  `utc_datetime` field in the database does no longer match the intended wall
+  time of 10 o'clock, but results in 9 o'clock when converted to CET. `Ecto.Type`s
+  are not really well suited for dealing with that ambiguouity, as values once
+  stored are meant to stay valid values.
+
+  ## Why store the datetime in `utc_datetime`
+
+  Given the problem of potentially changing timezone defintions, why should a
+  datetime even be converted to UTC for storage? The simple answer: comparability.
+  Without a common timezone for datetimes in the db comparisons get unnecessarily
+  tricky. And at least comparing to "now" is common enough to say most applications
+  will actually need to compare datetimes in the db to other datetimes.
+
+  ## Usage
+
+  `TzDatetime` consists of two parts:
+
+  * `handle_datetime/2` for handling changes to a "datetime".
+  * `original_datetime/2` for retrieving the original "datetime" in the stored timezone
+
+  ### Storing a "datetime"
+
+  The biggest problem for storage is that most input methods don't supply a datetime
+  with sufficient timezone information. Even ISO 8601 formatted string will only
+  include the offset, but not the timezone name. Therefore `TzDatetime` works with
+  multiple fields in a schema.
+
+      field :input_datetime, :naive_datetime, virtual: true
+      field :time_zone, :string
+
+      field :datetime, :utc_datetime
+      field :original_offset, :integer
+
+  The first two fields are for the input of data, while the second two are set
+  by `handle_datetime/2`.
+
+      def changeset(schema, params) do
+        schema
+        |> cast(params, [:input_datetime, :time_zone])
+        |> validate_required([:input_datetime, :time_zone])
+        |> TzDatetime.handle_datetime()
+      end
+
+  You can also customize the names for those fields by passing a keyword list
+  of `[{name :: atom, custom_name :: atom}]` as second parameter.
+
+  #### Ambiguous dates or gaps
+
+  Using a `naive_datetime` and a separate timezone as inputs results in some
+  complexity though. The input datetime might exist twice or might not exist in
+  the timezone. This is possible for the periods when switch between daylight
+  savings time and standard time.
+
+  When the clock is turned backwards a certain naive_datetime and timezone might
+  result in two possible datetimes with different `std_offset`.
+
+  When the clock is turned forward a certain naive_datetime and timezone might
+  result in no possible datetime, where elixir will return the last possible
+  datetime before the switch and the first possible datetime afterwards.
+
+  See `Datetime.from_naive/3` for detailed examples on those cases.
+
+  To handle those cases you need to implement the `TzDatetime` behaviour, where
+  you can handle those cases based on your business domains` requirements:
+
+      @impl TzDatetime
+      @spec when_ambiguous(Ecto.Changeset.t(), DateTime.t(), DateTime.t()) ::
+              Ecto.Changeset.t() | DateTime.t()
+      def when_ambiguous(_changeset, dt1, _dt2) do
+        # Implement your business logic
+        dt1
+      end
+
+      @impl TzDatetime
+      @spec when_gap(Ecto.Changeset.t(), DateTime.t(), DateTime.t()) ::
+              Ecto.Changeset.t() | DateTime.t()
+      def when_gap(changeset, _dt1, _dt2) do
+        # Implement your business logic
+        add_error(changeset, :datetime, "does not exist for the selected timezone")
+      end
+
+  `handle_datetime/2` will use the module of the schema by default, but you can
+  also supply a different module using the `:module` key on the options.
+
+  ### Reading datetimes
+
+  As mentioned earlier the timezone definitions can change over time. By storing
+  the offset used to convert to the utc value in the db `original_datetime/2` can
+  detect if this did indeed happen or not.
+
+      # When offset does still match
+      > original_datetime(schema)
+      {:ok, datetime}
+
+      # When offset does no longer match
+      > original_datetime(schema)
+      {:ambiguous, datetime_using_current_offset, datetime_using_stored_offset}
+
+      # When tz no longer exists (not the only possible error though)
+      > original_datetime(schema)
+      {:error, :time_zone_not_found}
+
+  `original_datetime/2` like `handle_datetime/2` can receive a keyword list of
+  mappings for the field names for `:datetime`, `:time_zone` and `:original_offset`.
+
+  """
   import Ecto.Changeset
 
+  @typedoc false
   @type fields :: %{
           input_datetime: :atom,
           time_zone: :atom,
-          datetime_field: :atom,
-          original_offset_field: :atom
+          datetime: :atom,
+          original_offset: :atom
         }
 
+  @doc """
+  Called when `DateTime.from_naive/3` does return `{:ambiguous, DateTime.t(), DateTime.t()}` for the input_datetime and the timezone.
+
+  Handle the case according to your business' requirements by either modifying
+  the changeset or returning a single valid `DateTime` struct.
+  """
   @callback when_ambiguous(Ecto.Changeset.t(), DateTime.t(), DateTime.t()) ::
               Ecto.Changeset.t() | DateTime.t()
+
+  @doc """
+  Called when `DateTime.from_naive/3` does return `{:gap, DateTime.t(), DateTime.t()}` for the input_datetime and the timezone.
+
+  Handle the case according to your business' requirements by either modifying
+  the changeset or returning a single valid `DateTime` struct.
+  """
   @callback when_gap(Ecto.Changeset.t(), DateTime.t(), DateTime.t()) ::
               Ecto.Changeset.t() | DateTime.t()
 
+  @doc """
+  Call this for a changeset with an input_datetime and timezone set, to calculate a datetime and original_offset.
+
+  ## Options:
+  * `:input_datetime` Used to change set the name of the field. Defaults to `:input_datetime`.
+  * `:time_zone` Used to change set the name of the field. Defaults to `:time_zone`.
+  * `:datetime` Used to change set the name of the field. Defaults to `:datetime`.
+  * `:original_offset` Used to change set the name of the field. Defaults to `:original_offset`.
+  * `:module` Module, which implements `TzDate`. Defaults to `changeset.data.__struct__`.
+  """
   @spec handle_datetime(Ecto.Changeset.t(), keyword()) :: Ecto.Changeset.t()
   def handle_datetime(changeset, opts \\ []) do
-    module = Keyword.get(opts, :module, changeset.data.__struct__)
     fields = fields_from_opts(opts)
+
+    # If any of the inputs has errors don't try to do anything
+    cond do
+      Keyword.has_key?(changeset.errors, fields.input_datetime) -> changeset
+      Keyword.has_key?(changeset.errors, fields.time_zone) -> changeset
+      true -> do_handle_datetime(changeset, fields, opts)
+    end
+  end
+
+  # Actually handle the cases for `DateTime.from_naive(input_datetime, time_zone)`
+  # Call into the behaviour implementing module for :ambiguous|:gap results
+  defp do_handle_datetime(changeset, fields, opts) do
+    module = Keyword.get(opts, :module, changeset.data.__struct__)
     input_datetime = get_change(changeset, fields.input_datetime)
     time_zone = get_change(changeset, fields.time_zone)
 
@@ -38,13 +198,18 @@ defmodule TzDatetime do
     end
   end
 
-  @spec handle_callback_result(Ecto.Changeset.t(), Ecto.Changeset.t() | DateTime.t(), fields) ::
+  # Handle both return options of an edited changeset or a datetime to use
+  @spec handle_callback_result(Ecto.Changeset.t(), Ecto.Changeset.t(), fields) ::
           Ecto.Changeset.t()
   defp handle_callback_result(_, %Ecto.Changeset{} = changeset, _), do: changeset
 
+  @spec handle_callback_result(Ecto.Changeset.t(), DateTime.t(), fields) ::
+          Ecto.Changeset.t()
   defp handle_callback_result(changeset, %DateTime{} = dt, fields),
     do: apply_datetime(changeset, dt, fields)
 
+  # When a datetime is computed set it to the changeset and store the offset used
+  # for later detection of changes.
   @spec handle_callback_result(Ecto.Changeset.t(), DateTime.t(), fields) :: Ecto.Changeset.t()
   defp apply_datetime(changeset, datetime, fields) do
     {:ok, utc_datetime} = Ecto.Type.cast(:utc_datetime, datetime)
@@ -54,8 +219,17 @@ defmodule TzDatetime do
     |> put_change(fields.original_offset, complete_offset(datetime))
   end
 
+  # Add utc and std offset together
   defp complete_offset(datetime), do: datetime.utc_offset + datetime.std_offset
 
+  @doc """
+  Call this on a schema to get back the datetime for the stored timezone
+
+  ## Options:
+  * `:time_zone` Used to change set the name of the field. Defaults to `:time_zone`.
+  * `:datetime` Used to change set the name of the field. Defaults to `:datetime`.
+  * `:original_offset` Used to change set the name of the field. Defaults to `:original_offset`.
+  """
   @spec original_datetime(struct, keyword()) ::
           {:ok, DateTime.t()}
           | {:ambiguous, DateTime.t(), DateTime.t()}
@@ -66,18 +240,15 @@ defmodule TzDatetime do
     time_zone = Map.fetch!(struct, fields.time_zone)
     original_offset = Map.fetch!(struct, fields.original_offset)
 
-    case DateTime.shift_zone(utc_datetime, time_zone) do
-      {:ok, datetime} ->
-        case original_offset - complete_offset(datetime) do
-          0 -> {:ok, datetime}
-          diff -> {:ambiguous, datetime, DateTime.add(datetime, diff, :second)}
-        end
-
-      {:error, _} = err ->
-        err
+    with {:ok, datetime} <- DateTime.shift_zone(utc_datetime, time_zone) do
+      case original_offset - complete_offset(datetime) do
+        0 -> {:ok, datetime}
+        diff -> {:ambiguous, datetime, DateTime.add(datetime, diff, :second)}
+      end
     end
   end
 
+  # Build a map for the fields from the options
   @spec fields_from_opts(keyword()) :: fields
   defp fields_from_opts(opts) do
     fields = %{
