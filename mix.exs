@@ -27,6 +27,7 @@ defmodule TzDatetime.MixProject do
   defp deps do
     [
       {:ecto, "~> 3.2"},
+      {:ex_doc, "~> 0.21.0"},
       {:mox, "~> 0.5.0", only: :test}
     ]
   end
