@@ -170,11 +170,13 @@ defmodule TzDatetime do
   def handle_datetime(changeset, opts \\ []) do
     fields = fields_from_opts(opts)
 
-    # If any of the inputs has errors don't try to do anything
-    cond do
-      Keyword.has_key?(changeset.errors, fields.input_datetime) -> changeset
-      Keyword.has_key?(changeset.errors, fields.time_zone) -> changeset
-      true -> do_handle_datetime(changeset, fields, opts)
+    with false <- Keyword.has_key?(changeset.errors, fields.input_datetime),
+         false <- Keyword.has_key?(changeset.errors, fields.time_zone),
+         changed_fields = Map.keys(changeset.changes),
+         true <- fields.input_datetime in changed_fields || fields.time_zone in changed_fields do
+      do_handle_datetime(changeset, fields, opts)
+    else
+      _ -> changeset
     end
   end
 
@@ -182,8 +184,8 @@ defmodule TzDatetime do
   # Call into the behaviour implementing module for :ambiguous|:gap results
   defp do_handle_datetime(changeset, fields, opts) do
     module = Keyword.get(opts, :module, changeset.data.__struct__)
-    input_datetime = get_change(changeset, fields.input_datetime)
-    time_zone = get_change(changeset, fields.time_zone)
+    input_datetime = get_field(changeset, fields.input_datetime)
+    time_zone = get_field(changeset, fields.time_zone)
 
     case DateTime.from_naive(input_datetime, time_zone) do
       {:ok, correct_datetime} ->
