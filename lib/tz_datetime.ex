@@ -205,7 +205,7 @@ defmodule TzDatetime do
         handle_callback_result(changeset, module.when_gap(changeset, dt1, dt2, fields), fields)
 
       {:error, :time_zone_not_found} ->
-        add_error(changeset, :timezone, "is invalid")
+        add_error(changeset, fields.time_zone, "is invalid")
     end
   end
 
