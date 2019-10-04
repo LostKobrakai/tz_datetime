@@ -232,6 +232,8 @@ defmodule TzDatetime do
         handle_callback_result(changeset, module.when_gap(changeset, dt1, dt2, fields), fields)
 
       {:error, :incompatible_calendars} ->
+        # the naive datetime does use a calendar not matching the
+        # selected timezone
         if function_exported?(module, :when_incompatible_calendar, 2) do
           handle_callback_result(
             changeset,
@@ -246,9 +248,6 @@ defmodule TzDatetime do
             calendar: input_datetime.calendar
           )
         end
-
-      # the naive datetime doesn't happen for the given timezones as
-      # the switch in std_offset skips it
 
       {:error, :time_zone_not_found} ->
         add_error(changeset, fields.time_zone, "is invalid")
