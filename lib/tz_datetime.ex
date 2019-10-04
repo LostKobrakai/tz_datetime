@@ -157,6 +157,21 @@ defmodule TzDatetime do
               Ecto.Changeset.t() | DateTime.t()
 
   @doc """
+  Called when `DateTime.from_naive/3` does return `{:error, :incompatible_calendars}` for the input_datetime and the timezone.
+
+  This should only be of a concern if you're handling input dates, which use a calendar different
+  to `Calendar.ISO`, therfore this callback is optional. By default the result will be handled
+  by adding an error for the time_zone field.
+
+  Handle the case according to your business' requirements by either modifying
+  the changeset or returning a single valid `DateTime` struct.
+  """
+  @callback when_incompatible_calendar(Ecto.Changeset.t(), fields) ::
+              Ecto.Changeset.t() | DateTime.t()
+
+  @optional_callbacks when_incompatible_calendar: 2
+
+  @doc """
   Call this for a changeset with an input_datetime and timezone set, to calculate a datetime and original_offset.
 
   ## Options:
@@ -203,6 +218,25 @@ defmodule TzDatetime do
         # the naive datetime doesn't happen for the given timezones as
         # the switch in std_offset skips it
         handle_callback_result(changeset, module.when_gap(changeset, dt1, dt2, fields), fields)
+
+      {:error, :incompatible_calendars} ->
+        if function_exported?(module, :when_incompatible_calendar, 2) do
+          handle_callback_result(
+            changeset,
+            module.when_incompatible_calendar(changeset, fields),
+            fields
+          )
+        else
+          Ecto.Changeset.add_error(
+            changeset,
+            fields.time_zone,
+            "is incompatible with the input datetime calendar",
+            calendar: input_datetime.calendar
+          )
+        end
+
+      # the naive datetime doesn't happen for the given timezones as
+      # the switch in std_offset skips it
 
       {:error, :time_zone_not_found} ->
         add_error(changeset, fields.time_zone, "is invalid")
