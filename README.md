@@ -24,6 +24,11 @@ def deps do
 end
 ```
 
+You'll also need to configure elixir to use a timezone database, which supports
+all the timezones you need to use. Elixir itself does only support `Etc/UTC`. For
+other timezones look at [`tz_data`](https://hex.pm/packages/tzdata) or other
+implementations of `Calendar.TimeZoneDatabase`.
+
 Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
 and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
 be found at [https://hexdocs.pm/tz_datetime](https://hexdocs.pm/tz_datetime).

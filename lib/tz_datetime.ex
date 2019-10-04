@@ -127,8 +127,20 @@ defmodule TzDatetime do
   `original_datetime/2` like `handle_datetime/2` can receive a keyword list of
   mappings for the field names for `:datetime`, `:time_zone` and `:original_offset`.
 
+  ## Timezone Database
+
+  By default elixir does only support `Etc/UTC` as a timezone. To use this library
+  you likely need to install an alternative `Calendar.TimeZoneDatabase` implementation.
   """
   import Ecto.Changeset
+  require Logger
+
+  if Calendar.get_time_zone_database() == Calendar.UTCOnlyTimeZoneDatabase do
+    Logger.warn("""
+    It seems like you didn't configure elixir to use an alternate timezone database.
+    The default Calendar.UTCOnlyTimeZoneDatabase does only support Etc/UTC timezone.
+    """)
+  end
 
   @typedoc "Holds a mapping of field purposes to actual field names"
   @type fields :: %{
@@ -160,7 +172,7 @@ defmodule TzDatetime do
   Called when `DateTime.from_naive/3` does return `{:error, :incompatible_calendars}` for the input_datetime and the timezone.
 
   This should only be of a concern if you're handling input dates, which use a calendar different
-  to `Calendar.ISO`, therfore this callback is optional. By default the result will be handled
+  to `Calendar.ISO`, therefore this callback is optional. By default the result will be handled
   by adding an error for the time_zone field.
 
   Handle the case according to your business' requirements by either modifying
