@@ -266,7 +266,7 @@ defmodule TzDatetime do
 
   # When a datetime is computed set it to the changeset and store the offset used
   # for later detection of changes.
-  @spec handle_callback_result(Ecto.Changeset.t(), DateTime.t(), fields) :: Ecto.Changeset.t()
+  @spec apply_datetime(Ecto.Changeset.t(), DateTime.t(), fields) :: Ecto.Changeset.t()
   defp apply_datetime(changeset, datetime, fields) do
     {:ok, utc_datetime} = Ecto.Type.cast(:utc_datetime, datetime)
 
