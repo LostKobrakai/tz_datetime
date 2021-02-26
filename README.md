@@ -27,10 +27,10 @@ might change though.
 
 ## Why store the datetime in a `utc_datetime` field in the first place?
 
-It's a simple answer: The ability to compare datetimes. Without a common timezone
-for datetimes comparisons get unnecessarily tricky. And at least
+There is a simple answer: The ability to compare datetimes. Without a common timezone
+for datetimes comparison get unnecessarily tricky. And at least
 comparing to "now" is common enough to say most applications will actually need
-to compare datetimes in the db to other datetimes.
+to compare datetimes in the db.
 
 ## Usage
 
@@ -41,21 +41,32 @@ to compare datetimes in the db to other datetimes.
 
 ### Storing a "datetime"
 
-The biggest problem for handling input is that most input methods don't supply
-a datetime with sufficient timezone information. Even ISO 8601 formatted string
-will only include the offset, but not the timezone name. Therefore `TzDatetime`
-works with multiple fields in a schema.
+For storing a "datetime" there are multiple fields required. 
 
 ```elixir
-field :input_datetime, :naive_datetime, virtual: true
-field :time_zone, :string
-
 field :datetime, :utc_datetime
+field :time_zone, :string
 field :original_offset, :integer
 ```
 
-The first two fields are for the input of data, while the second two are set
-by `handle_datetime/2`.
+`:datetime` is the datetime in UTC, `:time_zone` is the input timezone and 
+`:original_offset` the offset of `:time_zone` at the time of persistance.
+
+Those three fields together allow for comparing stored datetimes – all in UTC – 
+while still allowing detection of a change in the offset for the stored time zone 
+at the time the value is read.
+
+#### NaiveDateTime as input
+
+Often the user input doesn't supply a datetime with time zone, but a string format 
+like ISO 8601. But even ISO 8601 formatted string will only include the offset, 
+but not the timezone name. Therefore the input for `handle_datetime/2` does work 
+with a `:naive_datetime` in combination with the `:time_zone` field.
+
+```elixir
+field :input_datetime, :naive_datetime, virtual: true
+field :time_zone, :string # As listed prev.
+```
 
 ```elixir
 def changeset(schema, params) do
@@ -66,8 +77,8 @@ def changeset(schema, params) do
 end
 ```
 
-You can also customize the names for those fields by passing a keyword list
-of `[{name :: atom, custom_name :: atom}]` as second parameter.
+You can customize the names for those fields by passing a keyword list
+of `[{name :: atom, custom_name :: atom}]` as second parameter to `handle_datetime/2`.
 
 #### Ambiguous dates or gaps
 
@@ -115,9 +126,17 @@ As mentioned earlier the timezone definitions can change. Therefore
 the datetime stored can diverge over time from the value originally intended.
 By storing the offset used to convert to the utc value in the db
 `original_datetime/2` can detect if this did indeed happen or not. If a change
-is detected this can be used to inform users, who can decide if the wall time
-should be kept and the utc value in the db is wrong or if the point in time in
-utc is to be preserved and the stored offset to be updated.
+is detected two datetimes are returned, one with the changed offset and one with
+the offset as stored in the db.
+
+This can then be used to select between:
+
+- the wall time should be kept and the utc value in the db shall be updated
+- the point in time in utc is to be kept and the stored offset shall be updated
+
+Which option is the correct one could be infered automatically per use case or 
+even by notifying users about the change and letting them deal with it 
+accordingly.
 
 ```elixir
 # When offset does still match
@@ -128,7 +147,8 @@ utc is to be preserved and the stored offset to be updated.
 > original_datetime(schema)
 {:ambiguous, datetime_using_current_offset, datetime_using_stored_offset}
 
-# When tz no longer exists (not the only possible error though)
+# Error cases:
+# E.g. when tz no longer exists
 > original_datetime(schema)
 {:error, :time_zone_not_found}
 ```
