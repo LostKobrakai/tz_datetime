@@ -87,7 +87,7 @@ defmodule TzDatetime do
     input_datetime = get_field(changeset, fields.input_datetime)
     time_zone = get_field(changeset, fields.time_zone)
 
-    case DateTime.from_naive(input_datetime, time_zone) do
+    case safe_from_naive(input_datetime, time_zone) do
       {:ok, correct_datetime} ->
         apply_datetime(changeset, correct_datetime, fields)
 
@@ -124,8 +124,18 @@ defmodule TzDatetime do
 
       {:error, :time_zone_not_found} ->
         add_error(changeset, fields.time_zone, "is invalid")
+
+      nil ->
+        changeset
     end
   end
+
+  # Safely allow nil values when casting to DateTime
+  defp safe_from_naive(nil, _time_zone), do: nil
+  defp safe_from_naive(_input_datetime, nil), do: nil
+
+  defp safe_from_naive(input_datetime, time_zone),
+    do: DateTime.from_naive(input_datetime, time_zone)
 
   # Handle both return options of an edited changeset or a datetime to use
   @spec handle_callback_result(Ecto.Changeset.t(), Ecto.Changeset.t(), fields) ::

@@ -119,6 +119,38 @@ defmodule TzDatetimeTest do
 
       Mox.verify!()
     end
+
+    test "nil input_datetime" do
+      Mox.stub(
+        TzDatetime.TimeZoneDatabaseMock,
+        :time_zone_periods_from_wall_datetime,
+        fn _, "TzDatetime/Test" ->
+          period = %{
+            :utc_offset => 3600,
+            :std_offset => 0,
+            :zone_abbr => "TZT"
+          }
+
+          {:ok, period}
+        end
+      )
+
+      params = %{
+        input_datetime: nil,
+        time_zone: "TzDatetime/Test"
+      }
+
+      changeset =
+        TzDatetime.OptionalInputSchema.changeset(%TzDatetime.OptionalInputSchema{}, params)
+
+      changeset = TzDatetime.handle_datetime(changeset)
+      assert {:ok, data} = Ecto.Changeset.apply_action(changeset, :insert)
+
+      assert data.input_datetime == nil
+      assert data.datetime == nil
+      assert data.time_zone == "TzDatetime/Test"
+      assert data.original_offset == nil
+    end
   end
 
   describe "original_datetime/2" do
