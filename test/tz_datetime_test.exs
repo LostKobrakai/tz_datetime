@@ -126,10 +126,10 @@ defmodule TzDatetimeTest do
         :time_zone_periods_from_wall_datetime,
         fn _, "TzDatetime/Test" ->
           period = %{
-          :utc_offset => 3600,
-          :std_offset => 0,
-          :zone_abbr => "TZT"
-        }
+            :utc_offset => 3600,
+            :std_offset => 0,
+            :zone_abbr => "TZT"
+          }
 
           {:ok, period}
         end
@@ -140,7 +140,8 @@ defmodule TzDatetimeTest do
         time_zone: "TzDatetime/Test"
       }
 
-      changeset = TzDatetime.OptionalInputSchema.changeset(%TzDatetime.OptionalInputSchema{}, params)
+      changeset =
+        TzDatetime.OptionalInputSchema.changeset(%TzDatetime.OptionalInputSchema{}, params)
 
       changeset = TzDatetime.handle_datetime(changeset)
       assert {:ok, data} = Ecto.Changeset.apply_action(changeset, :insert)
