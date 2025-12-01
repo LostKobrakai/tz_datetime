@@ -9,7 +9,7 @@ defmodule TzDatetime do
   require Logger
 
   if Calendar.get_time_zone_database() == Calendar.UTCOnlyTimeZoneDatabase do
-    Logger.warn("""
+    Logger.warning("""
     It seems like you didn't configure elixir to use an alternate timezone database.
     The default Calendar.UTCOnlyTimeZoneDatabase does only support Etc/UTC timezone.
     """)
