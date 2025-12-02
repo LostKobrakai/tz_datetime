@@ -7,7 +7,7 @@ defmodule TzDatetime.MixProject do
       version: "0.1.3",
       elixir: "~> 1.15",
       name: "tz_datetime",
-      source_url: "https://github.com/madeitGmbH/tz_datetime",
+      source_url: "https://github.com/LostKobrakai/tz_datetime",
       description: description(),
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -23,7 +23,9 @@ defmodule TzDatetime.MixProject do
   defp package() do
     [
       licenses: ["Apache-2.0"],
-      links: %{"GitHub" => "https://github.com/madeitGmbH/tz_datetime"}
+      links: %{
+        "GitHub" => "https://github.com/LostKobrakai/tz_datetime"
+      }
     ]
   end
 
@@ -41,9 +43,9 @@ defmodule TzDatetime.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:ecto, "~> 3.2"},
-      {:ex_doc, "~> 0.23.0", only: :dev, runtime: false},
-      {:mox, "~> 0.5.0", only: :test}
+      {:ecto, "~> 3.4"},
+      {:ex_doc, "~> 0.34", only: :dev, runtime: false, warn_if_outdated: true},
+      {:mox, "~> 1.0", only: :test}
     ]
   end
 end
