@@ -1,6 +1,5 @@
 defmodule TzDatetimeTest do
   use ExUnit.Case
-  import TzDatetime.Sigil
 
   describe "handle_datetime/2" do
     test "success" do
