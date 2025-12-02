@@ -4,7 +4,7 @@ defmodule TzDatetime.MixProject do
   def project do
     [
       app: :tz_datetime,
-      version: "1.0.0",
+      version: "1.0.1",
       elixir: "~> 1.15",
       name: "tz_datetime",
       source_url: "https://github.com/LostKobrakai/tz_datetime",
